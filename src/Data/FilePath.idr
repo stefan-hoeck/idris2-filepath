@@ -1,68 +1,10 @@
 module Data.FilePath
 
-import public Data.DPair
+import public Data.FilePath.Body
 import public Data.List1
 import public Data.String
 
 %default total
-
---------------------------------------------------------------------------------
---          Constants
---------------------------------------------------------------------------------
-
-public export %inline
-Sep : String
-Sep = "/"
-
-public export %inline
-CurrentDir : String
-CurrentDir = "."
-
-public export %inline
-ParentDir : String
-ParentDir = ".."
-
---------------------------------------------------------------------------------
---          Utilities
---------------------------------------------------------------------------------
-
-public export
-dropEnd : Nat -> SnocList a -> (Nat, SnocList a)
-dropEnd 0     sx        = (0, sx)
-dropEnd k     [<]       = (k, [<])
-dropEnd (S k) (sx :< x) = dropEnd k sx
-
-||| Proof that the given string does not contain the path separator
-public export
-0 NoSep : String -> Type
-NoSep s = isInfixOf Sep s === False
-
-||| Checks if the given string does not contain a
-||| path separator.
-public export
-noSep : String -> Maybe (Subset String NoSep)
-noSep s with (isInfixOf Sep s) proof prf
-  _ | False = Just (Element s prf)
-  _ | True  = Nothing
-
-||| True, if the given path body corresponds to the
-||| current directory symbol (`.`).
-public export %inline
-isCurrent : String -> Bool
-isCurrent = (== CurrentDir)
-
-||| True, if the given path body corresponds to the
-||| parent directory symbol (`..`).
-public export %inline
-isParent : String -> Bool
-isParent = (== ParentDir)
-
-||| True, if the given path body does not correspond to the
-||| current or parent directory symbol.
-public export %inline
-notSpecial : String -> Bool
-notSpecial s = not (isCurrent s || isParent s)
-
 --------------------------------------------------------------------------------
 --          Path
 --------------------------------------------------------------------------------
@@ -81,11 +23,10 @@ data PathType = Rel | Abs
 public export
 data Path : PathType -> Type where
   ||| An absolute path
-  PAbs   : SnocList String -> Path Abs
+  PAbs   : SnocList Body -> Path Abs
 
-  ||| A relative path, prefixed with the given number of
-  ||| parent directory tokens (`..`).
-  PRel   : (nrParents : Nat) -> SnocList String -> Path Rel
+  ||| A relative path
+  PRel   : SnocList Body -> Path Rel
 
 ||| Concatenate two paths, the second of which must be
 ||| relative.
@@ -98,37 +39,32 @@ data Path : PathType -> Type where
 ||| the number of parent tockens of the left path.
 public export
 (</>) : Path t -> Path Rel -> Path t
-(</>) (PAbs sx)   (PRel n sy) = PAbs (snd (dropEnd n sx) ++ sy)
-(</>) (PRel m sx) (PRel n sy) =
-  let (n',sx') = dropEnd n sx in PRel (m + n') (sx' ++ sy)
+(</>) (PAbs sx) (PRel sy) = PAbs (sx ++ sy)
+(</>) (PRel sx) (PRel sy) = PRel (sx ++ sy)
 
 ||| Append a file or directory to a path.
-export
-(/>) : Path t -> (s : String) -> {auto 0 prf : NoSep s} -> Path t
-fp /> s = case trim s of
-  ""   => fp
-  "."  => fp
-  ".." => fp </> PRel 1 [<]
-  st   => fp </> PRel 0 [< st]
+export %inline
+(/>) : Path t -> Body -> Path t
+fp /> s = fp </> PRel [< s]
 
 ||| Try and split a path into parent directory and
 ||| file/directory name.
 public export
-split : Path t -> Maybe (Path t, String)
-split (PAbs (sx :< x))   = Just (PAbs sx, x)
-split (PRel n (sx :< x)) = Just (PRel n sx, x)
-split (PAbs [<])         = Nothing
-split (PRel _ [<])       = Nothing
+split : Path t -> Maybe (Path t, Body)
+split (PAbs (sx :< x)) = Just (PAbs sx, x)
+split (PRel (sx :< x)) = Just (PRel sx, x)
+split (PAbs [<])       = Nothing
+split (PRel [<])       = Nothing
 
 ||| Append a file ending to a path. If the path is empty,
 ||| this appends a hidden file/directory by prepending the
 ||| name with a dot.
 export
-(<.>) : Path t -> (s : String) -> {auto 0 prf : NoSep s} -> Path t
-PAbs (sx :< x)   <.> s = PAbs (sx :< "\{x}.\{s}")
-PRel n (sx :< x) <.> s = PRel n (sx :< "\{x}.\{s}")
-PRel n [<]       <.> s = PRel n [< ".\{s}"]
-PAbs [<]         <.> s = PAbs [< ".\{s}"]
+(<.>) : Path t -> Body -> Path t
+PAbs (sx :< x) <.> s = PAbs (sx :< (x <+> preDot s))
+PRel (sx :< x) <.> s = PRel (sx :< (x <+> preDot s))
+PRel [<]       <.> s = PRel [< preDot s]
+PAbs [<]       <.> s = PAbs [< preDot s]
 
 ||| The root of the file system.
 public export
@@ -138,8 +74,8 @@ root = PAbs [<]
 ||| Checks whether an unknown path is absolute or not.
 export
 isAbsolute : Path t -> Bool
-isAbsolute (PAbs _)   = True
-isAbsolute (PRel _ _) = False
+isAbsolute (PAbs _) = True
+isAbsolute (PRel _) = False
 
 ||| Tries to extract the parent directory from a path.
 export
@@ -153,51 +89,41 @@ parentDirs fp = case parentDir fp of
   Nothing => []
   Just p  => p :: parentDirs (assert_smaller fp p)
 
-namespace Subset
-  ||| Append a file or directory to a path.
-  export %inline
-  (/>) : Path t -> Subset String NoSep -> Path t
-  fp /> Element s _ = fp /> s
-
-  ||| Append a file ending to a path. If the path is empty,
-  ||| this appends a hidden file/directory by prepending the
-  ||| name with a dot.
-  export %inline
-  (<.>) : Path t -> Subset String NoSep -> Path t
-  fp <.> Element s _ = fp <.> s
-
 --------------------------------------------------------------------------------
 --          Interfaces
 --------------------------------------------------------------------------------
 
+mapToList : (a -> b) -> SnocList a -> List b -> List b
+mapToList f [<]       xs = xs
+mapToList f (sx :< x) xs = mapToList f sx (f x :: xs)
+
 export
 Show (Path t) where
-  show (PAbs sx)   =
-    fastConcat . (Sep ::) . intersperse Sep $ sx <>> []
-  show (PRel n sx) =
-    fastConcat . intersperse Sep $ replicate n ParentDir ++ (sx <>> [])
+  showPrec p (PAbs sx) = showCon p "PAbs" $ showArg sx
+  showPrec p (PRel sx) = showCon p "PRel" $ showArg sx
 
 export
 Interpolation (Path t) where
-  interpolate = show
+  interpolate (PAbs sx) =
+    fastConcat . ("/" ::) . intersperse "/" $ mapToList interpolate sx []
+  interpolate (PRel sx) =
+    fastConcat . intersperse "/" $ mapToList interpolate sx []
 
 ||| Heterogeneous equality for paths
 export
 heq : Path t1 -> Path t2 -> Bool
-heq (PAbs sx)   (PAbs sy)   = sx == sy
-heq (PRel m sx) (PRel n sy) = m == n && sx == sy
-heq _           _           = False
+heq (PAbs sx) (PAbs sy) = sx == sy
+heq (PRel sx) (PRel sy) = sx == sy
+heq _         _         = False
 
 
 ||| Heterogeneous comparison of paths
 export
 hcomp : Path t1 -> Path t2 -> Ordering
-hcomp (PAbs sx)   (PAbs sy)   = compare sx sy
-hcomp (PRel m sx) (PRel n sy) = case compare m n of
-  EQ => compare sx sy
-  o  => o
-hcomp (PAbs _)    (PRel _ _)  = LT
-hcomp (PRel _ _)  (PAbs _)    = GT
+hcomp (PAbs sx) (PAbs sy) = compare sx sy
+hcomp (PRel sx) (PRel sy) = compare sx sy
+hcomp (PAbs _)  (PRel _)  = LT
+hcomp (PRel _)  (PAbs _)  = GT
 
 public export %inline
 Eq (Path t) where (==) = heq
@@ -209,7 +135,7 @@ public export
 Semigroup (Path Rel) where (<+>) = (</>)
 
 public export
-Monoid (Path Rel) where neutral = PRel 0 [<]
+Monoid (Path Rel) where neutral = PRel [<]
 
 --------------------------------------------------------------------------------
 --          FilePath
@@ -236,36 +162,36 @@ Show FilePath where show (FP p) = show p
 export
 Interpolation FilePath where interpolate (FP p) = interpolate p
 
-public export
-keep : String -> Bool
-keep "" = False
-keep s  = notSpecial s
-
-||| Tries to parse a file path as faithfully as possible.
-|||
-||| All whitespace on the left and right is trimmed before
-||| parsing. All current directory and parent directory symbols
-||| (`.` and `..`) in the middle of the path will be dropped.
-||| Finally, all bodies consisting only of whitespace will be
-||| dropped.
-public export
-FromString FilePath where
-  fromString s = case trim s of
-    "" => FP $ PRel 0 Lin
-    st => case map trim $ split ('/' ==) st of
-      ""  ::: ps => FP $ PAbs $ [<] <>< filter keep ps
-      "." ::: ps => FP $ PRel 0 $ [<] <>< filter keep ps
-      p   ::: ps =>
-        let (pre,post) = break (not . isParent) (p :: ps)
-         in FP $ PRel (length pre) $ [<] <>< filter keep post
-
-
+-- public export
+-- keep : String -> Bool
+-- keep "" = False
+-- keep s  = notSpecial s
+--
+-- ||| Tries to parse a file path as faithfully as possible.
+-- |||
+-- ||| All whitespace on the left and right is trimmed before
+-- ||| parsing. All current directory and parent directory symbols
+-- ||| (`.` and `..`) in the middle of the path will be dropped.
+-- ||| Finally, all bodies consisting only of whitespace will be
+-- ||| dropped.
+-- public export
+-- FromString FilePath where
+--   fromString s = case trim s of
+--     "" => FP $ PRel 0 Lin
+--     st => case map trim $ split ('/' ==) st of
+--       ""  ::: ps => FP $ PAbs $ [<] <>< filter keep ps
+--       "." ::: ps => FP $ PRel 0 $ [<] <>< filter keep ps
+--       p   ::: ps =>
+--         let (pre,post) = break (not . isParent) (p :: ps)
+--          in FP $ PRel (length pre) $ [<] <>< filter keep post
+--
+--
 namespace FilePath
 
   ||| Append a file or directory to a path.
   public export
-  (/>) : FilePath -> (s : String) -> {auto 0 prf : NoSep s} -> FilePath
-  FP fp /> s = FP $ fp /> s
+  (/>) : FilePath -> (b : Body) -> FilePath
+  FP fp /> b = FP $ fp /> b
 
   ||| Append a relative path do a file path.
   public export
@@ -275,14 +201,14 @@ namespace FilePath
   ||| Try and split a path into parent directory and
   ||| file/directory name.
   public export
-  split : FilePath -> Maybe (FilePath, String)
+  split : FilePath -> Maybe (FilePath, Body)
   split (FP p) = map (\(fp,s) => (FP fp, s)) $ split p
 
   ||| Append a file ending to a path. If the path is empty,
   ||| this appends a hidden file/directory by prepending the
   ||| name with a dot.
   public export
-  (<.>) : FilePath -> (s : String) -> {auto 0 prf : NoSep s} -> FilePath
+  (<.>) : FilePath -> (b : Body) -> FilePath
   FP fp <.> s = FP $ fp <.> s
 
   ||| The root of the file system.
@@ -305,19 +231,6 @@ namespace FilePath
   parentDirs : FilePath -> List FilePath
   parentDirs (FP p) = map (\p' => FP p') $ parentDirs p
 
-  namespace Subset
-    ||| Append a file or directory to a path.
-    export %inline
-    (/>) : FilePath -> Subset String NoSep -> FilePath
-    fp /> Element s _ = fp /> s
-
-    ||| Append a file ending to a path. If the path is empty,
-    ||| this appends a hidden file/directory by prepending the
-    ||| name with a dot.
-    export %inline
-    (<.>) : FilePath -> Subset String NoSep -> FilePath
-    fp <.> Element s _ = fp <.> s
-
 --------------------------------------------------------------------------------
 --          fromString
 --------------------------------------------------------------------------------
@@ -329,29 +242,29 @@ data IsAbs : FilePath -> Type where
 
 public export %inline
 toAbs : (fp : FilePath) -> {auto 0 prf : IsAbs fp} -> Path Abs
-toAbs (FP (PAbs sstr)) = PAbs sstr
-toAbs (FP (PRel _ _)) impossible
+toAbs (FP (PAbs sx)) = PAbs sx
+toAbs (FP (PRel _)) impossible
 
 ||| Witness that the given file path is an absolute path
 public export
 data IsRel : FilePath -> Type where
-  ItIsRel : IsRel (FP $ PRel n sx)
+  ItIsRel : IsRel (FP $ PRel sx)
 
 public export %inline
 toRel : (fp : FilePath) -> {auto 0 prf : IsRel fp} -> Path Rel
-toRel (FP (PRel n sstr)) = PRel n sstr
+toRel (FP (PRel sx)) = PRel sx
 toRel (FP (PAbs _)) impossible
-
-namespace AbsPath
-  public export
-  fromString : (s : String)
-             -> {auto 0 prf : IsAbs (fromString s)}
-             -> Path Abs
-  fromString s = toAbs (fromString s)
-
-namespace RelPath
-  public export
-  fromString : (s : String)
-             -> {auto 0 prf : IsRel (fromString s)}
-             -> Path Rel
-  fromString s = toRel (fromString s)
+--
+-- namespace AbsPath
+--   public export
+--   fromString : (s : String)
+--              -> {auto 0 prf : IsAbs (fromString s)}
+--              -> Path Abs
+--   fromString s = toAbs (fromString s)
+--
+-- namespace RelPath
+--   public export
+--   fromString : (s : String)
+--              -> {auto 0 prf : IsRel (fromString s)}
+--              -> Path Rel
+--   fromString s = toRel (fromString s)

@@ -11,3 +11,4 @@ depends = base >= 0.5.1
 sourcedir = "src"
 
 modules = Data.FilePath
+        , Data.FilePath.Body
