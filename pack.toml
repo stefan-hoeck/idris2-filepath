@@ -1,0 +1,9 @@
+[custom.all.filepath]
+type   = "local"
+path   = "."
+ipkg   = "filepath.ipkg"
+
+[custom.all.filepath-test]
+type   = "local"
+path   = "test"
+ipkg   = "test.ipkg"

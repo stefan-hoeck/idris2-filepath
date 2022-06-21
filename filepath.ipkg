@@ -1,0 +1,13 @@
+package filepath
+version      = 0.0.1
+authors      = "stefan-hoeck"
+readme       = "README.md"
+license      = "BSD-3 Clause"
+brief        = "Unix style file paths"
+langversion >= 0.5.1
+
+depends = base >= 0.5.1
+
+sourcedir = "src"
+
+modules = Data.FilePath

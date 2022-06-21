@@ -1,2 +1,1 @@
-# idris2-filepath
-Unix style file paths in Idris2
+# idris2-filepath: Unix style file paths in Idris2
