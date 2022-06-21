@@ -223,6 +223,15 @@ bodyChars (c :: h :: t) = case endChar c of
     No0 contra => No0 $ \(Many _ bi) => contra bi
   No0 contra => No0 $ \(Many ec _) => contra ec
 
+||| Tries to convert a string to a body
+public export
+body : String -> Maybe Body
+body s =
+  let cs = unpack s
+   in case bodyChars cs of
+        Yes0 prf => Just (MkBody cs prf)
+        No0  _   => Nothing
+
 public export
 fromString : (s : String) -> {auto 0 p : IsYes (bodyChars $ unpack s)} -> Body
 fromString s = MkBody (unpack s) (fromYes $ bodyChars (unpack s))

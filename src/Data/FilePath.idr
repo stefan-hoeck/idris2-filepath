@@ -162,30 +162,18 @@ Show FilePath where show (FP p) = show p
 export
 Interpolation FilePath where interpolate (FP p) = interpolate p
 
--- public export
--- keep : String -> Bool
--- keep "" = False
--- keep s  = notSpecial s
---
--- ||| Tries to parse a file path as faithfully as possible.
--- |||
--- ||| All whitespace on the left and right is trimmed before
--- ||| parsing. All current directory and parent directory symbols
--- ||| (`.` and `..`) in the middle of the path will be dropped.
--- ||| Finally, all bodies consisting only of whitespace will be
--- ||| dropped.
--- public export
--- FromString FilePath where
---   fromString s = case trim s of
---     "" => FP $ PRel 0 Lin
---     st => case map trim $ split ('/' ==) st of
---       ""  ::: ps => FP $ PAbs $ [<] <>< filter keep ps
---       "." ::: ps => FP $ PRel 0 $ [<] <>< filter keep ps
---       p   ::: ps =>
---         let (pre,post) = break (not . isParent) (p :: ps)
---          in FP $ PRel (length pre) $ [<] <>< filter keep post
---
---
+||| Tries to parse a file path as faithfully as possible.
+|||
+||| All whitespace on the left and right is trimmed before
+||| parsing. Only valid path bodies will be kept.
+export
+FromString FilePath where
+  fromString s = case trim s of
+    "" => FP $ PRel Lin
+    st => case map trim $ split ('/' ==) st of
+      "" ::: ps => FP $ PAbs $ [<] <>< mapMaybe body ps
+      p  ::: ps => FP $ PRel $ [<] <>< mapMaybe body (p :: ps)
+
 namespace FilePath
 
   ||| Append a file or directory to a path.
@@ -254,17 +242,17 @@ public export %inline
 toRel : (fp : FilePath) -> {auto 0 prf : IsRel fp} -> Path Rel
 toRel (FP (PRel sx)) = PRel sx
 toRel (FP (PAbs _)) impossible
---
--- namespace AbsPath
---   public export
---   fromString : (s : String)
---              -> {auto 0 prf : IsAbs (fromString s)}
---              -> Path Abs
---   fromString s = toAbs (fromString s)
---
--- namespace RelPath
---   public export
---   fromString : (s : String)
---              -> {auto 0 prf : IsRel (fromString s)}
---              -> Path Rel
---   fromString s = toRel (fromString s)
+
+namespace AbsPath
+  public export
+  fromString : (s : String)
+             -> {auto 0 prf : IsAbs (fromString s)}
+             -> Path Abs
+  fromString s = toAbs (fromString s)
+
+namespace RelPath
+  public export
+  fromString : (s : String)
+             -> {auto 0 prf : IsRel (fromString s)}
+             -> Path Rel
+  fromString s = toRel (fromString s)
