@@ -6,9 +6,25 @@ import Data.String
 
 %default total
 
-public export
+--------------------------------------------------------------------------------
+--          Constants
+--------------------------------------------------------------------------------
+
+public export %inline
 Sep : String
 Sep = "/"
+
+public export %inline
+CurrentDir : String
+CurrentDir = "."
+
+public export %inline
+ParentDir : String
+ParentDir = ".."
+
+--------------------------------------------------------------------------------
+--          Utilities
+--------------------------------------------------------------------------------
 
 public export
 dropEnd : Nat -> SnocList a -> (Nat, SnocList a)
@@ -31,21 +47,19 @@ noSep s with (isInfixOf Sep s) proof prf
 
 ||| True, if the given path body corresponds to the
 ||| current directory symbol (`.`).
-public export
+public export %inline
 isCurrent : String -> Bool
-isCurrent "." = True
-isCurrent _   = False
+isCurrent = (== CurrentDir)
 
 ||| True, if the given path body corresponds to the
 ||| parent directory symbol (`..`).
-public export
+public export %inline
 isParent : String -> Bool
-isParent ".." = True
-isParent _    = False
+isParent = (== ParentDir)
 
 ||| True, if the given path body does not correspond to the
 ||| current or parent directory symbol.
-public export
+public export %inline
 notSpecial : String -> Bool
 notSpecial s = not (isCurrent s || isParent s)
 
@@ -159,20 +173,23 @@ namespace Subset
 export
 Show (Path t) where
   show (PAbs sx)   =
-    fastConcat . ("/" ::) . intersperse "/" $ sx <>> []
+    fastConcat . (Sep ::) . intersperse Sep $ sx <>> []
   show (PRel n sx) =
-    fastConcat . intersperse "/" $ replicate n ".." ++ (sx <>> [])
+    fastConcat . intersperse Sep $ replicate n ParentDir ++ (sx <>> [])
 
 export
 Interpolation (Path t) where
   interpolate = show
 
+||| Heterogeneous equality for paths
 export
 heq : Path t1 -> Path t2 -> Bool
 heq (PAbs sx)   (PAbs sy)   = sx == sy
 heq (PRel m sx) (PRel n sy) = m == n && sx == sy
 heq _           _           = False
 
+
+||| Heterogeneous comparison of paths
 export
 hcomp : Path t1 -> Path t2 -> Ordering
 hcomp (PAbs sx)   (PAbs sy)   = compare sx sy
