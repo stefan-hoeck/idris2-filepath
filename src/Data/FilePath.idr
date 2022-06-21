@@ -1,8 +1,8 @@
 module Data.FilePath
 
-import Data.DPair
-import Data.List1
-import Data.String
+import public Data.DPair
+import public Data.List1
+import public Data.String
 
 %default total
 
@@ -236,21 +236,29 @@ Show FilePath where show (FP p) = show p
 export
 Interpolation FilePath where interpolate (FP p) = interpolate p
 
+public export
+keep : String -> Bool
+keep "" = False
+keep s  = notSpecial s
+
 ||| Tries to parse a file path as faithfully as possible.
 |||
 ||| All whitespace on the left and right is trimmed before
 ||| parsing. All current directory and parent directory symbols
 ||| (`.` and `..`) in the middle of the path will be dropped.
+||| Finally, all bodies consisting only of whitespace will be
+||| dropped.
 public export
 FromString FilePath where
   fromString s = case trim s of
     "" => FP $ PRel 0 Lin
-    st => case split ('/' ==) st of
-      ""  ::: ps => FP $ PAbs $ [<] <>< filter notSpecial ps
-      "." ::: ps => FP $ PRel 0 $ [<] <>< filter notSpecial ps
+    st => case map trim $ split ('/' ==) st of
+      ""  ::: ps => FP $ PAbs $ [<] <>< filter keep ps
+      "." ::: ps => FP $ PRel 0 $ [<] <>< filter keep ps
       p   ::: ps =>
         let (pre,post) = break (not . isParent) (p :: ps)
-         in FP $ PRel (length pre) $ [<] <>< filter notSpecial post
+         in FP $ PRel (length pre) $ [<] <>< filter keep post
+
 
 namespace FilePath
 
@@ -309,3 +317,41 @@ namespace FilePath
     export %inline
     (<.>) : FilePath -> Subset String NoSep -> FilePath
     fp <.> Element s _ = fp <.> s
+
+--------------------------------------------------------------------------------
+--          fromString
+--------------------------------------------------------------------------------
+
+||| Witness that the given file path is an absolute path
+public export
+data IsAbs : FilePath -> Type where
+  ItIsAbs : IsAbs (FP $ PAbs sx)
+
+public export %inline
+toAbs : (fp : FilePath) -> {auto 0 prf : IsAbs fp} -> Path Abs
+toAbs (FP (PAbs sstr)) = PAbs sstr
+toAbs (FP (PRel _ _)) impossible
+
+||| Witness that the given file path is an absolute path
+public export
+data IsRel : FilePath -> Type where
+  ItIsRel : IsRel (FP $ PRel n sx)
+
+public export %inline
+toRel : (fp : FilePath) -> {auto 0 prf : IsRel fp} -> Path Rel
+toRel (FP (PRel n sstr)) = PRel n sstr
+toRel (FP (PAbs _)) impossible
+
+namespace AbsPath
+  public export
+  fromString : (s : String)
+             -> {auto 0 prf : IsAbs (fromString s)}
+             -> Path Abs
+  fromString s = toAbs (fromString s)
+
+namespace RelPath
+  public export
+  fromString : (s : String)
+             -> {auto 0 prf : IsRel (fromString s)}
+             -> Path Rel
+  fromString s = toRel (fromString s)

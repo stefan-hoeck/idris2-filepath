@@ -1,9 +1,7 @@
 module FilePathProps
 
-import Data.DPair
 import Data.FilePath
 import Data.SOP
-import Data.String
 import Data.Vect
 import Hedgehog
 
@@ -31,7 +29,9 @@ ending = toNoSep <$> string (linear 1 5) alphaNum
 
 export
 relDir : Gen (Path Rel)
-relDir = PRel 0 . (Lin <><) <$> list (linear 0 6) body'
+relDir = [| toRel (nat $ linear 0 4) (list (linear 0 6) body') |]
+  where toRel : Nat -> List String -> Path Rel
+        toRel n ss = PRel n (Lin <>< ss)
 
 export
 absDir : Gen (Path Abs)
@@ -81,7 +81,32 @@ prop_appendEmpty = property $ do
 prop_prependEmpty2 : Property
 prop_prependEmpty2 = property $ do
   Element d _ <- forAll body
-  ("" /> d) === fromString d
+  (the FilePath "" /> d) === fromString d
+
+prop_appendParentDir1 : Property
+prop_appendParentDir1 = property $ do
+  [d,b1,Element b2 _] <- forAll $ np [absDir,body,body]
+  ((d /> b1) </> (RelPath.fromString ".." /> b2)) === (d /> b2)
+
+prop_appendParentDir2 : Property
+prop_appendParentDir2 = property $ do
+  [d,b1,b2,Element b3 _] <- forAll $ np [absDir,body,body,body]
+  ((d /> b1 /> b2) </> (RelPath.fromString "../../" /> b3)) === (d /> b3)
+
+prop_appendAssoc : Property
+prop_appendAssoc = property $ do
+  [x,y,z] <- forAll $ np [relDir, relDir, relDir]
+  (x <+> (y <+> z)) === ((x <+> y) <+> z)
+
+prop_appendLeftNeutral : Property
+prop_appendLeftNeutral = property $ do
+  x <- forAll relDir
+  (neutral <+> x) === x
+
+prop_appendRightNeutral : Property
+prop_appendRightNeutral = property $ do
+  x <- forAll relDir
+  (x <+> neutral) === x
 
 --------------------------------------------------------------------------------
 --          Group
@@ -96,4 +121,9 @@ props = MkGroup "FilePath" [
       , ("prop_prependEmpty", prop_prependEmpty)
       , ("prop_prependEmpty2", prop_prependEmpty2)
       , ("prop_appendEmpty", prop_appendEmpty)
+      , ("prop_appendParentDir1", prop_appendParentDir1)
+      , ("prop_appendParentDir2", prop_appendParentDir2)
+      , ("prop_appendAssoc", prop_appendAssoc)
+      , ("prop_appendLeftNeutral", prop_appendLeftNeutral)
+      , ("prop_appendRightNeutral", prop_appendRightNeutral)
       ]
