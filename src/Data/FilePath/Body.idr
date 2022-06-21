@@ -2,6 +2,9 @@
 ||| bodies in a file path.
 module Data.FilePath.Body
 
+import Data.List
+import Data.List1
+
 %default total
 
 --------------------------------------------------------------------------------
@@ -223,14 +226,17 @@ bodyChars (c :: h :: t) = case endChar c of
     No0 contra => No0 $ \(Many _ bi) => contra bi
   No0 contra => No0 $ \(Many ec _) => contra ec
 
-||| Tries to convert a string to a body
+||| Tries to convert a list of character to a body
 public export
+fromChars : List Char -> Maybe Body
+fromChars cs = case bodyChars cs of
+  Yes0 prf => Just $ MkBody cs prf
+  No0 _    => Nothing
+
+||| Tries to convert a string to a body
+public export %inline
 body : String -> Maybe Body
-body s =
-  let cs = unpack s
-   in case bodyChars cs of
-        Yes0 prf => Just (MkBody cs prf)
-        No0  _   => Nothing
+body = fromChars . unpack
 
 public export
 fromString : (s : String) -> {auto 0 p : IsYes (bodyChars $ unpack s)} -> Body
@@ -239,3 +245,11 @@ fromString s = MkBody (unpack s) (fromYes $ bodyChars (unpack s))
 export
 preDot : Body -> Body
 preDot (MkBody cs p) = MkBody ('.' :: cs) (preDotBodyChars p)
+
+export
+splitFileName : Body -> Maybe (Body,Body)
+splitFileName (MkBody b _) =
+  let ss := split ('.' ==) b
+   in [| MkPair (fromChars $ join $ intersperse ['.'] (init ss))
+                (fromChars $ last ss) |]
+

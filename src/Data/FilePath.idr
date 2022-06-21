@@ -77,8 +77,13 @@ isAbsolute : Path t -> Bool
 isAbsolute (PAbs _) = True
 isAbsolute (PRel _) = False
 
+||| Tries to extract the basename from a path.
+export %inline
+basename : Path t -> Maybe Body
+basename = map snd . split
+
 ||| Tries to extract the parent directory from a path.
-export
+export %inline
 parentDir : Path t -> Maybe (Path t)
 parentDir = map fst . split
 
@@ -88,6 +93,31 @@ parentDirs : Path t -> List (Path t)
 parentDirs fp = case parentDir fp of
   Nothing => []
   Just p  => p :: parentDirs (assert_smaller fp p)
+
+||| Try and split a path into parent directory and
+||| file/directory name.
+export
+splitFileName : Path t -> Maybe (Path t, Body)
+splitFileName p = do
+  (p2,b)     <- split p
+  (base,ext) <- splitFileName b
+  pure (p2 /> base, ext)
+
+||| Try and split a path into the stem and extension
+||| of the basename.
+export
+stemAndExt : Path t -> Maybe (Body, Body)
+stemAndExt p = split p >>= splitFileName . snd
+
+||| Try and extract the file stem from a path.
+export
+fileStem : Path t -> Maybe Body
+fileStem p = map fst (stemAndExt p) <|> map snd (split p)
+
+||| Try and extract the extension from a file.
+export %inline
+extension : Path t -> Maybe Body
+extension = map snd . stemAndExt
 
 --------------------------------------------------------------------------------
 --          Interfaces
@@ -209,6 +239,11 @@ namespace FilePath
   isAbsolute : FilePath -> Bool
   isAbsolute (FP p) = isAbsolute p
 
+  ||| Tries to extract the basename from a path.
+  export %inline
+  basename : FilePath -> Maybe Body
+  basename = map snd . split
+
   ||| Tries to extract the parent directory from a path.
   export
   parentDir : FilePath -> Maybe FilePath
@@ -218,6 +253,28 @@ namespace FilePath
   export
   parentDirs : FilePath -> List FilePath
   parentDirs (FP p) = map (\p' => FP p') $ parentDirs p
+
+  ||| Try and split a path into parent directory and
+  ||| file/directory name.
+  export
+  splitFileName : FilePath -> Maybe (FilePath, Body)
+  splitFileName (FP p) = mapFst FP <$> splitFileName p
+
+  ||| Try and split a path into the stem and extension
+  ||| of the basename.
+  export %inline
+  stemAndExt : FilePath -> Maybe (Body, Body)
+  stemAndExt (FP p) = stemAndExt p
+
+  ||| Try and extract the file stem from a path.
+  export %inline
+  fileStem : FilePath -> Maybe Body
+  fileStem (FP p) = fileStem p
+
+  ||| Try and extract the extension from a file.
+  export %inline
+  extension : FilePath -> Maybe Body
+  extension (FP p) = extension p
 
 --------------------------------------------------------------------------------
 --          fromString
