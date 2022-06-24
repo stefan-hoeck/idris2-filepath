@@ -161,9 +161,14 @@ Show (Path t) where
 export
 Interpolation (Path t) where
   interpolate (PAbs sx) =
-    fastConcat . ("/" ::) . intersperse "/" $ mapToList interpolate sx []
+    fastConcat
+      . ("/" ::)
+      . intersperse "/"
+      $ mapToList interpolate (normAbs sx) []
   interpolate (PRel sx) =
-    fastConcat . intersperse "/" $ mapToList interpolate sx []
+    fastConcat
+      . intersperse "/"
+      $ mapToList interpolate (normRel sx) []
 
 ||| Heterogeneous equality for paths
 export
