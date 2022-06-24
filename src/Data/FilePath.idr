@@ -119,6 +119,32 @@ export %inline
 extension : Path t -> Maybe Body
 extension = map snd . stemAndExt
 
+normAbs : SnocList Body -> SnocList Body
+normAbs [<]          = [<]
+normAbs (sx :< "..") = case normAbs sx of
+  [<]        => [<]
+  (sx2 :< _) => sx2
+normAbs (sx :< x)  = normAbs sx :< x
+
+normRel : SnocList Body -> SnocList Body
+normRel [<] = [<]
+normRel (sx :< "..") = case normRel sx of
+  [<]           => [< ".."]
+  (sx2 :< "..") => sx2 :< ".." :< ".."
+  (sx2 :< _)    => sx2
+normRel (sx :< x)  = normRel sx :< x
+
+||| Remove references to parent directories (`..`)
+||| by removing the according number of parent dirs.
+|||
+||| In case of absolute paths, excess `..`s will be
+||| silently dropped.
+export
+normalize : Path t -> Path t
+normalize (PAbs sx) = PAbs (normAbs sx)
+normalize (PRel sx) = PRel (normRel sx)
+
+
 --------------------------------------------------------------------------------
 --          Interfaces
 --------------------------------------------------------------------------------
