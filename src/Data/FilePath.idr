@@ -100,14 +100,14 @@ export
 splitFileName : Path t -> Maybe (Path t, Body)
 splitFileName p = do
   (p2,b)     <- split p
-  (base,ext) <- splitFileName b
+  (base,ext) <- split b
   pure (p2 /> base, ext)
 
 ||| Try and split a path into the stem and extension
 ||| of the basename.
 export
 stemAndExt : Path t -> Maybe (Body, Body)
-stemAndExt p = split p >>= splitFileName . snd
+stemAndExt p = split p >>= split . snd
 
 ||| Try and extract the file stem from a path.
 export
@@ -232,8 +232,8 @@ FromString FilePath where
   fromString s = case trim s of
     "" => FP $ PRel Lin
     st => case map trim $ split ('/' ==) st of
-      "" ::: ps => FP $ PAbs $ [<] <>< mapMaybe body ps
-      p  ::: ps => FP $ PRel $ [<] <>< mapMaybe body (p :: ps)
+      "" ::: ps => FP $ PAbs $ [<] <>< mapMaybe parse ps
+      p  ::: ps => FP $ PRel $ [<] <>< mapMaybe parse (p :: ps)
 
 namespace FilePath
 
@@ -346,7 +346,7 @@ namespace AbsPath
 
   public export
   fromString :  (s : String)
-             -> {auto 0 prf : IsJust (parse s)}
+             -> {auto 0 prf : IsJust (AbsPath.parse s)}
              -> Path Abs
   fromString s = fromJust (parse s)
 
@@ -366,3 +366,19 @@ namespace RelPath
              -> {auto 0 prf : IsJust (RelPath.parse s)}
              -> Path Rel
   fromString s = fromJust (parse s)
+
+--------------------------------------------------------------------------------
+--          Tests
+--------------------------------------------------------------------------------
+
+-- Performance test: This typechecks *much* faster than the original
+-- implementation
+testRel : Path Rel
+testRel =
+  "abdlkjf/sdf/bb/sdfljlsjdfsdfjl/kklsdj2320398we/_jkw0r/u23__0294owe/jwjf.txt"
+
+-- Performance test: This typechecks *much* faster than the original
+-- implementation
+testAbs : Path Abs
+testAbs =
+  "/bdlkjf/sdf/bb/sdfljlsjdfsdfjl/kklsdj2320398we/_jkw0r/u23__0294owe/jwjf.txt"
