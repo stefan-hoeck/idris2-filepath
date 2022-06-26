@@ -1,3 +1,6 @@
+||| A small API for working with file and directory
+||| paths, with the ability to distinguish between relative
+||| and absolute paths at the type level.
 module Data.FilePath
 
 import public Data.FilePath.Body
@@ -6,6 +9,7 @@ import public Data.Maybe
 import public Data.String
 
 %default total
+
 --------------------------------------------------------------------------------
 --          Path
 --------------------------------------------------------------------------------
@@ -30,13 +34,6 @@ data Path : PathType -> Type where
 
 ||| Concatenate two paths, the second of which must be
 ||| relative.
-|||
-||| If the second path has `n` parent directory tokens,
-||| at most `n` levels will be removed from the end of
-||| the first paths list of bodies. Excess numbers of parent
-||| directories will be silently dropped in case of absolute
-||| paths. In case of relative paths, they will be added to
-||| the number of parent tockens of the left path.
 public export
 (</>) : Path t -> Path Rel -> Path t
 (</>) (PAbs sx) (PRel sy) = PAbs (sx ++ sy)
@@ -94,8 +91,7 @@ parentDirs fp = case parentDir fp of
   Nothing => []
   Just p  => p :: parentDirs (assert_smaller fp p)
 
-||| Try and split a path into parent directory and
-||| file/directory name.
+||| Try and split a path into base name and file extension.
 export
 splitFileName : Path t -> Maybe (Path t, Body)
 splitFileName p = do
@@ -285,8 +281,7 @@ namespace FilePath
   parentDirs : FilePath -> List FilePath
   parentDirs (FP p) = map (\p' => FP p') $ parentDirs p
 
-  ||| Try and split a path into parent directory and
-  ||| file/directory name.
+  ||| Try and split a path into base name and file extension.
   export
   splitFileName : FilePath -> Maybe (FilePath, Body)
   splitFileName (FP p) = mapFst FP <$> splitFileName p
