@@ -246,10 +246,16 @@ export
 preDot : Body -> Body
 preDot (MkBody cs p) = MkBody ('.' :: cs) (preDotBodyChars p)
 
+infixr 7 <.>
+
+||| Append a file ending to a path body.
+export
+(<.>) : Body -> Body -> Body
+x <.> y = x <+> preDot y
+
 export
 splitFileName : Body -> Maybe (Body,Body)
 splitFileName (MkBody b _) =
   let ss := split ('.' ==) b
    in [| MkPair (fromChars $ join $ intersperse ['.'] (init ss))
                 (fromChars $ last ss) |]
-
