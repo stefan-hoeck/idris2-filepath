@@ -8,27 +8,35 @@ import Data.List1
 %default total
 
 --------------------------------------------------------------------------------
---          Dec0
+--          Utils
 --------------------------------------------------------------------------------
 
-||| Decidability with erased proofs
 public export
-data Dec0 : t -> Type where
-  Yes0 : (0 prf : t) -> Dec0 t
-  No0  : (0 contra : t -> Void) -> Dec0 t
+check : (b : Bool) -> Maybe (b === True)
+check False = Nothing
+check True  = Just Refl
 
-public export
-data IsYes : Dec0 t -> Type where
-  ItIsYes : IsYes (Yes0 prf)
+0 unAnd : {x,y : Bool} -> (x && y) === True -> (x === True, y === True)
+unAnd {x = True}  {y = True}  _ = (Refl,Refl)
+unAnd {x = True}  {y = False} _ impossible
+unAnd {x = False} {y = _}     _ impossible
 
-public export
-0 fromYes : (d : Dec0 t) -> {auto _ : IsYes d} -> t
-fromYes (Yes0 prf) = prf
+0 unAnd1 : {x,y : Bool} -> (x && y) === True -> x === True
+unAnd1 = fst . unAnd
+
+0 unAnd2 : {x,y : Bool} -> (x && y) === True -> y === True
+unAnd2 = snd . unAnd
+
+0 and : {x,y : Bool} -> x === True -> y === True -> (x && y) === True
+and {x = True}  {y = True}  _ _ = Refl
+and {x = True}  {y = False} _ _ impossible
+and {x = False} {y = _}     _ _ impossible
 
 --------------------------------------------------------------------------------
 --          Constants
 --------------------------------------------------------------------------------
 
+||| The Unix path separator
 public export %inline
 Sep : Char
 Sep = '/'
@@ -45,62 +53,49 @@ isBodyChar '/' = False
 isBodyChar c   = not (isControl c)
 
 public export
-data BodyChar : Char -> Type where
-  IsBodyChar : (0 prf : isBodyChar c === True) -> BodyChar c
-
-public export
-bodyChar : (c : Char) -> Dec0 (BodyChar c)
-bodyChar c with (isBodyChar c) proof eq
-  _ | True  = Yes0 (IsBodyChar eq)
-  _ | False = No0 $ \(IsBodyChar prf) => absurd (trans (sym prf) eq)
-
+0 BodyChar : Char -> Type
+BodyChar c = isBodyChar c === True
 
 export
-Uninhabited (BodyChar '\t') where
-  uninhabited (IsBodyChar prf) impossible
+0 notBodyCharTab : BodyChar '\t' -> Void
+notBodyCharTab prf impossible
 
 export
-Uninhabited (BodyChar '\r') where
-  uninhabited (IsBodyChar prf) impossible
+0 notBodyCharRet : BodyChar '\r' -> Void
+notBodyCharRet prf impossible
 
 export
-Uninhabited (BodyChar '\n') where
-  uninhabited (IsBodyChar prf) impossible
+0 notBodyCharNL : BodyChar '\n' -> Void
+notBodyCharNL prf impossible
 
 export
-Uninhabited (BodyChar '\b') where
-  uninhabited (IsBodyChar prf) impossible
+0 notBodyCharB : BodyChar '\b' -> Void
+notBodyCharB prf impossible
 
 export
-Uninhabited (BodyChar '\0') where
-  uninhabited (IsBodyChar prf) impossible
+0 notBodyChar0 : BodyChar '\0' -> Void
+notBodyChar0 prf impossible
 
 --------------------------------------------------------------------------------
 --          EndChar
 --------------------------------------------------------------------------------
 
-||| Character at the end of a path body.
-||| Although theoretically allowed in Unix paths, we don't
-||| allow trailing spaces for reasons of sanity.
+||| We don't accept spaces at the end of path bodies.
 public export
-data EndChar : Char -> Type where
-  IsEndChar : (0 ib : BodyChar c) -> (0 prf : (c == ' ') === False) -> EndChar c
+isEndChar : Char -> Bool
+isEndChar c = isBodyChar c && c /= ' '
+
+public export
+0 EndChar : Char -> Type
+EndChar c = isEndChar c === True
 
 export
 Uninhabited (EndChar ' ') where
-  uninhabited (IsEndChar _ prf) impossible
+  uninhabited prf impossible
 
-public export
-0 endCharImpliesBodyChar : EndChar c -> BodyChar c
-endCharImpliesBodyChar (IsEndChar ib _) = ib
-
-public export
-endChar : (c : Char) -> Dec0 (EndChar c)
-endChar c with (c == ' ') proof eq
-  _ | True  = No0 $ \(IsEndChar _ prf) => absurd (trans (sym prf) eq)
-  _ | False = case bodyChar c of
-    Yes0 ib    => Yes0 (IsEndChar ib eq)
-    No0 contra => No0 $ \ec => contra (endCharImpliesBodyChar ec)
+export
+0 notEndCharSpace : EndChar ' ' -> Void
+notEndCharSpace prf impossible
 
 --------------------------------------------------------------------------------
 --          SingleChar
@@ -108,68 +103,89 @@ endChar c with (c == ' ') proof eq
 
 ||| We don't accept path bodies consisting of a single dot.
 public export
-data SingleChar : Char -> Type where
-  IsSingleChar : (0 ie : EndChar c) -> (0 prf : (c == '.') === False) -> SingleChar c
+isSingleChar : Char -> Bool
+isSingleChar c = isEndChar c && c /= '.'
+
+public export
+0 SingleChar : Char -> Type
+SingleChar c = isSingleChar c === True
 
 export
-Uninhabited (SingleChar '.') where
-  uninhabited (IsSingleChar _ prf) impossible
+0 notSingleCharDot : SingleChar '.' -> Void
+notSingleCharDot prf impossible
+
+--------------------------------------------------------------------------------
+--          BodyInner
+--------------------------------------------------------------------------------
+
+||| True if the given list of characters can appear after the initial
+||| character of a path body.
+public export
+isBodyInner : List Char -> Bool
+isBodyInner []        = False
+isBodyInner (x :: []) = isEndChar x
+isBodyInner (x :: xs) = isBodyChar x && isBodyInner xs
 
 public export
-0 singleCharImpliesEndChar : SingleChar c -> EndChar c
-singleCharImpliesEndChar (IsSingleChar ie _) = ie
+0 BodyInner : List Char -> Type
+BodyInner xs = isBodyInner xs === True
+
+||| True if the given list of characters represent a valid path body.
+public export
+isBodyChars : List Char -> Bool
+isBodyChars []        = False
+isBodyChars (x :: []) = isSingleChar x
+isBodyChars (x :: xs) = isEndChar x && isBodyInner xs
 
 public export
-singleChar : (c : Char) -> Dec0 (SingleChar c)
-singleChar c with (c == '.') proof eq
-  _ | True  = No0 $ \(IsSingleChar _ prf) => absurd (trans (sym prf) eq)
-  _ | False = case endChar c of
-    Yes0 ie    => Yes0 (IsSingleChar ie eq)
-    No0 contra => No0 $ \sc => contra (singleCharImpliesEndChar sc)
+0 BodyChars : List Char -> Type
+BodyChars xs = isBodyChars xs === True
 
-public export
-data BodyInner : List Char -> Type where
-  End  : (0 prf : EndChar c) -> BodyInner [c]
-  Cons : (0 prf : BodyChar c) -> (0 bi : BodyInner cs) -> BodyInner (c :: cs)
+0 notBodyCharsEmpty : BodyChars [] -> Void
+notBodyCharsEmpty refl impossible
 
-public export
-data BodyChars : List Char -> Type where
-  One  : (0 prf : SingleChar c) -> BodyChars [c]
-  Many : (0 prf : EndChar c) -> (0 bi : BodyInner cs) -> BodyChars (c :: cs)
-
-export
-Uninhabited (BodyChars []) where
-  uninhabited One impossible
-  uninhabited (Many _ _) impossible
-
-export
-Uninhabited (BodyChars ['.']) where
-  uninhabited (One prf) = void $ absurd prf
-  uninhabited (Many _ _) impossible
+0 notBodyCharsDot : BodyChars ['.'] -> Void
+notBodyCharsDot refl impossible
 
 --------------------------------------------------------------------------------
 --          Concatenation Proofs
 --------------------------------------------------------------------------------
 
 export
-0 toInner : BodyChars xs -> BodyInner xs
-toInner (One prf)     = End (singleCharImpliesEndChar prf)
-toInner (Many prf bi) = Cons (endCharImpliesBodyChar prf) bi
+0 toInner : (xs : List Char) -> BodyChars xs -> BodyInner xs
+toInner (x :: [])      prf = unAnd1 prf
+toInner (x :: y :: ys) prf =
+  let (p1,p2) = unAnd prf in and (unAnd1 p1) p2
+toInner []             prf impossible
 
 export
-0 appendInnerChars : BodyInner xs -> BodyInner ys -> BodyInner (xs ++ ys)
-appendInnerChars (End p)     y = Cons (endCharImpliesBodyChar p) y
-appendInnerChars (Cons p bi) y = Cons p $ appendInnerChars bi y
+0 appendInnerChars :  (xs,ys : List Char)
+                   -> BodyInner xs
+                   -> BodyInner ys
+                   -> BodyInner (xs ++ ys)
+appendInnerChars (h :: [])      (y :: ys) prf1 prf2 =
+  and (unAnd1 prf1) prf2
+appendInnerChars (h :: t@(x :: xs)) ys prf1 prf2 =
+  and (unAnd1 prf1) (appendInnerChars t ys (unAnd2 prf1) prf2)
+appendInnerChars [] _ _ _ impossible
+appendInnerChars _  [] _ _ impossible
 
 export
-0 appendBodyChars : BodyChars xs -> BodyChars ys -> BodyChars (xs ++ ys)
-appendBodyChars (One p)     y = Many (singleCharImpliesEndChar p) (toInner y)
-appendBodyChars (Many p bi) y = Many p (appendInnerChars bi $ toInner y)
+0 appendBodyChars :  (xs,ys : List Char)
+                  -> BodyChars xs
+                  -> BodyChars ys
+                  -> BodyChars (xs ++ ys)
+appendBodyChars (h :: [])      (y :: ys) prf1 prf2 =
+  and (unAnd1 prf1) (toInner (y :: ys) prf2)
+appendBodyChars (h :: x :: xs) ys prf1 prf2 =
+  and (unAnd1 prf1) (appendInnerChars _ _ (unAnd2 prf1) $ toInner _ prf2)
+appendBodyChars [] _ _ _ impossible
+appendBodyChars _  [] _ _ impossible
 
 export
-0 preDotBodyChars : BodyChars cs -> BodyChars ('.' :: cs)
-preDotBodyChars (One p) = Many %search (End $ singleCharImpliesEndChar p)
-preDotBodyChars (Many p bi) = Many %search (Cons (endCharImpliesBodyChar p) bi)
+0 preDotBodyChars : (cs : List Char) -> BodyChars cs -> BodyChars ('.' :: cs)
+preDotBodyChars (h :: t) prf = toInner _ prf
+preDotBodyChars [] prf impossible
 
 --------------------------------------------------------------------------------
 --          Body
@@ -201,55 +217,78 @@ Interpolation Body where
 
 export %inline
 Semigroup Body where
-  MkBody x px <+> MkBody y py = MkBody (x ++ y) (appendBodyChars px py)
+  MkBody x px <+> MkBody y py = MkBody (x ++ y) (appendBodyChars _ _px py)
 
-public export
-innerChars : (c : Char) -> (cs : List Char) -> Dec0 (BodyInner $ c :: cs)
-innerChars c [] = case endChar c of
-  Yes0 ec    => Yes0 (End ec)
-  No0 contra => No0 $ \(End ec) => contra ec
-innerChars c (h :: t) = case bodyChar c of
-  No0 contra => No0 $ \(Cons prf bi) => contra prf
-  Yes0 prf   => case innerChars h t of
-    Yes0 bi => Yes0 (Cons prf bi)
-    No0 contra => No0 $ \(Cons prf bi) => contra bi
-
-public export
-bodyChars : (cs : List Char) -> Dec0 (BodyChars cs)
-bodyChars [] = No0 $ \prf => absurd prf
-bodyChars (x :: [])     = case singleChar x of
-  Yes0 prf   => Yes0 (One prf)
-  No0 contra => No0 $ \(One prf) => contra prf
-bodyChars (c :: h :: t) = case endChar c of
-  Yes0 ec => case innerChars h t of
-    Yes0 bi => Yes0 (Many ec bi)
-    No0 contra => No0 $ \(Many _ bi) => contra bi
-  No0 contra => No0 $ \(Many ec _) => contra ec
 
 ||| Tries to convert a list of character to a body
 public export
 fromChars : List Char -> Maybe Body
-fromChars cs = case bodyChars cs of
-  Yes0 prf => Just $ MkBody cs prf
-  No0 _    => Nothing
+fromChars cs = case check (isBodyChars cs) of
+  Just prf => Just $ MkBody cs prf
+  Nothing  => Nothing
 
 ||| Tries to convert a string to a body
-public export %inline
+|||
+||| Deprecated: Use `parse` instead.
+public export %inline %deprecate
 body : String -> Maybe Body
 body = fromChars . unpack
 
+||| Tries to convert a string to a body
+public export %inline
+parse : String -> Maybe Body
+parse = fromChars . unpack
+
 public export
-fromString : (s : String) -> {auto 0 p : IsYes (bodyChars $ unpack s)} -> Body
-fromString s = MkBody (unpack s) (fromYes $ bodyChars (unpack s))
+fromString : (s : String) -> {auto 0 p : BodyChars (unpack s)} -> Body
+fromString s = MkBody (unpack s) p
 
 export
 preDot : Body -> Body
-preDot (MkBody cs p) = MkBody ('.' :: cs) (preDotBodyChars p)
+preDot (MkBody cs p) = MkBody ('.' :: cs) (preDotBodyChars _ p)
 
+infixr 7 <.>
+
+||| Append a file ending to a path body.
 export
+(<.>) : Body -> Body -> Body
+x <.> y = x <+> preDot y
+
+||| Deprecated: Use `split` instead.
+export %deprecate
 splitFileName : Body -> Maybe (Body,Body)
 splitFileName (MkBody b _) =
   let ss := split ('.' ==) b
    in [| MkPair (fromChars $ join $ intersperse ['.'] (init ss))
                 (fromChars $ last ss) |]
 
+||| Tries to split a path body into its stem an extension.
+export
+split : Body -> Maybe (Body,Body)
+split (MkBody b _) =
+  let ss := split ('.' ==) b
+   in [| MkPair (fromChars $ join $ intersperse ['.'] (init ss))
+                (fromChars $ last ss) |]
+
+||| Tries to extract a stem from a file name.
+export %inline
+fileStem : Body -> Maybe Body
+fileStem = map fst . split
+
+||| Tries to extract an extension from a file name.
+export %inline
+extension : Body -> Maybe Body
+extension = map fst . split
+
+--------------------------------------------------------------------------------
+--          Tests
+--------------------------------------------------------------------------------
+
+-- Performance test: This typechecks *much* faster than the original
+-- implementation
+test : Body
+test =  fromString
+     $  "sdfljlsjdfsdfjl_kklsdfkj2320398wejjkwe0r9u23__02394oweijwjf"
+     ++ "sdfljlsjdfsdfjl_kklsdfkj2320398wejjkwe0r9u23__02394oweijwjf"
+     ++ "sdfljlsjdfsdfjl_kklsdfkj2320398wejjkwe0r9u23__02394oweijwjf"
+     ++ "sdfljlsjdfsdfjl_kklsdfkj2320398wejjkwe0r9u23__02394oweijwjf"

@@ -2,6 +2,7 @@ module Data.FilePath
 
 import public Data.FilePath.Body
 import public Data.List1
+import public Data.Maybe
 import public Data.String
 
 %default total
@@ -10,7 +11,6 @@ import public Data.String
 --------------------------------------------------------------------------------
 
 infixl 5 </>, />
-infixr 7 <.>
 
 ||| A path in the file system is either relative
 ||| or absolute.
@@ -61,8 +61,8 @@ split (PRel [<])       = Nothing
 ||| name with a dot.
 export
 (<.>) : Path t -> Body -> Path t
-PAbs (sx :< x) <.> s = PAbs (sx :< (x <+> preDot s))
-PRel (sx :< x) <.> s = PRel (sx :< (x <+> preDot s))
+PAbs (sx :< x) <.> s = PAbs (sx :< (x <.> s))
+PRel (sx :< x) <.> s = PRel (sx :< (x <.> s))
 PRel [<]       <.> s = PRel [< preDot s]
 PAbs [<]       <.> s = PAbs [< preDot s]
 
@@ -100,14 +100,14 @@ export
 splitFileName : Path t -> Maybe (Path t, Body)
 splitFileName p = do
   (p2,b)     <- split p
-  (base,ext) <- splitFileName b
+  (base,ext) <- split b
   pure (p2 /> base, ext)
 
 ||| Try and split a path into the stem and extension
 ||| of the basename.
 export
 stemAndExt : Path t -> Maybe (Body, Body)
-stemAndExt p = split p >>= splitFileName . snd
+stemAndExt p = split p >>= split . snd
 
 ||| Try and extract the file stem from a path.
 export
@@ -232,8 +232,8 @@ FromString FilePath where
   fromString s = case trim s of
     "" => FP $ PRel Lin
     st => case map trim $ split ('/' ==) st of
-      "" ::: ps => FP $ PAbs $ [<] <>< mapMaybe body ps
-      p  ::: ps => FP $ PRel $ [<] <>< mapMaybe body (p :: ps)
+      "" ::: ps => FP $ PAbs $ [<] <>< mapMaybe parse ps
+      p  ::: ps => FP $ PRel $ [<] <>< mapMaybe parse (p :: ps)
 
 namespace FilePath
 
@@ -332,15 +332,53 @@ toRel (FP (PRel sx)) = PRel sx
 toRel (FP (PAbs _)) impossible
 
 namespace AbsPath
+  ||| A quite strict function for parsing absolute paths.
+  ||| This only accepts valid file bodies, so no doubling
+  ||| of path separators or bodies starting with or ending
+  ||| on whitespace. Sorry.
   public export
-  fromString : (s : String)
-             -> {auto 0 prf : IsAbs (fromString s)}
+  parse : String -> Maybe (Path Abs)
+  parse s = case unpack s of
+    '/' :: t =>
+      let ps := split ('/' ==) t
+       in PAbs . (Lin <><) <$> traverse fromChars (forget ps)
+    _        => Nothing
+
+  public export
+  fromString :  (s : String)
+             -> {auto 0 prf : IsJust (AbsPath.parse s)}
              -> Path Abs
-  fromString s = toAbs (fromString s)
+  fromString s = fromJust (parse s)
 
 namespace RelPath
+  ||| A quite strict function for parsing relative paths.
+  ||| This only accepts valid file bodies, so no doubling
+  ||| of path separators or bodies starting with or ending
+  ||| on whitespace. Sorry.
   public export
-  fromString : (s : String)
-             -> {auto 0 prf : IsRel (fromString s)}
+  parse : String -> Maybe (Path Rel)
+  parse s =
+    let ps := split ('/' ==) (unpack s)
+     in PRel . (Lin <><) <$> traverse fromChars (forget ps)
+
+  public export
+  fromString :  (s : String)
+             -> {auto 0 prf : IsJust (RelPath.parse s)}
              -> Path Rel
-  fromString s = toRel (fromString s)
+  fromString s = fromJust (parse s)
+
+--------------------------------------------------------------------------------
+--          Tests
+--------------------------------------------------------------------------------
+
+-- Performance test: This typechecks *much* faster than the original
+-- implementation
+testRel : Path Rel
+testRel =
+  "abdlkjf/sdf/bb/sdfljlsjdfsdfjl/kklsdj2320398we/_jkw0r/u23__0294owe/jwjf.txt"
+
+-- Performance test: This typechecks *much* faster than the original
+-- implementation
+testAbs : Path Abs
+testAbs =
+  "/bdlkjf/sdf/bb/sdfljlsjdfsdfjl/kklsdj2320398we/_jkw0r/u23__0294owe/jwjf.txt"

@@ -18,11 +18,11 @@ body' : Gen String
 body' = string (linear 1 20) bodyChar
 
 body : Gen Body
-body = fromMaybe "body" . body <$> body'
+body = fromMaybe "body" . parse <$> body'
 
 export
 ending : Gen Body
-ending = fromMaybe "txt" . body <$> string (linear 1 5) alphaNum
+ending = fromMaybe "txt" . parse <$> string (linear 1 5) alphaNum
 
 export
 relDir : Gen (Path Rel)
