@@ -12,3 +12,4 @@ sourcedir = "src"
 
 modules = Data.FilePath
         , Data.FilePath.Body
+        , Data.FilePath.File
