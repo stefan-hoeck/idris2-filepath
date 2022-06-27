@@ -278,7 +278,7 @@ fileStem = map fst . split
 ||| Tries to extract an extension from a file name.
 export %inline
 extension : Body -> Maybe Body
-extension = map fst . split
+extension = map snd . split
 
 --------------------------------------------------------------------------------
 --          Tests
