@@ -147,3 +147,79 @@ namespace RelFile
              -> {auto 0 prf : IsJust (RelFile.parse s)}
              -> File Rel
   fromString s = fromJust (parse s)
+
+--------------------------------------------------------------------------------
+--          AnyFile
+--------------------------------------------------------------------------------
+
+||| A path (relative or absolute) in a file system.
+public export
+record AnyFile where
+  constructor AF
+  {0 pathType : PathType}
+  file        : File pathType
+
+public export %inline
+Eq AnyFile where
+  AF p1 == AF p2 = heq (toPath p1) (toPath p2)
+
+public export
+Ord AnyFile where
+  compare (AF p1) (AF p2) = hcomp (toPath p1) (toPath p2)
+
+export
+Show AnyFile where show (AF p) = show p
+
+export
+Interpolation AnyFile where interpolate (AF p) = interpolate p
+
+namespace AnyFile
+
+  ||| Try and split a path into parent directory and
+  ||| file/directory name.
+  public export
+  split : AnyFile -> (FilePath, Body)
+  split (AF p) = let (f',b) := split p in (FP f', b)
+
+  ||| Append a file ending to a path. If the path is empty,
+  ||| this appends a hidden file/directory by prepending the
+  ||| name with a dot.
+  public export
+  (<.>) : AnyFile -> (b : Body) -> AnyFile
+  AF fp <.> s = AF $ fp <.> s
+
+  ||| Checks whether an unknown path is absolute or not.
+  export
+  isAbsolute : AnyFile -> Bool
+  isAbsolute (AF p) = isAbsolute p.parent
+
+  ||| Tries to extract the basename from a path.
+  export %inline
+  basename : AnyFile -> Body
+  basename = snd . split
+
+  ||| Tries to extract the parent directory from a path.
+  export
+  parentDir : AnyFile -> FilePath
+  parentDir = fst . split
+
+  ||| Try and split a path into base name and file extension.
+  export
+  splitFileName : AnyFile -> Maybe (AnyFile, Body)
+  splitFileName (AF p) = mapFst AF <$> splitFileName p
+
+  ||| Try and split a path into the stem and extension
+  ||| of the basename.
+  export %inline
+  stemAndExt : AnyFile -> Maybe (Body, Body)
+  stemAndExt (AF p) = stemAndExt p
+
+  ||| Try and extract the file stem from a path.
+  export %inline
+  fileStem : AnyFile -> Maybe Body
+  fileStem (AF p) = fileStem p
+
+  ||| Try and extract the extension from a file.
+  export %inline
+  extension : AnyFile -> Maybe Body
+  extension (AF p) = extension p
