@@ -228,13 +228,6 @@ fromChars cs = case check (isBodyChars cs) of
   Nothing  => Nothing
 
 ||| Tries to convert a string to a body
-|||
-||| Deprecated: Use `parse` instead.
-public export %inline %deprecate
-body : String -> Maybe Body
-body = fromChars . unpack
-
-||| Tries to convert a string to a body
 public export %inline
 parse : String -> Maybe Body
 parse = fromChars . unpack
@@ -253,14 +246,6 @@ infixr 7 <.>
 export
 (<.>) : Body -> Body -> Body
 x <.> y = x <+> preDot y
-
-||| Deprecated: Use `split` instead.
-export %deprecate
-splitFileName : Body -> Maybe (Body,Body)
-splitFileName (MkBody b _) =
-  let ss := split ('.' ==) b
-   in [| MkPair (fromChars $ join $ intersperse ['.'] (init ss))
-                (fromChars $ last ss) |]
 
 ||| Tries to split a path body into its stem an extension.
 export
