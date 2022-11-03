@@ -10,8 +10,6 @@ on:
   pull_request:
     branches:
       - main
-  schedule:
-    - cron: '0 1 * * *'
 
 defaults:
   run:
@@ -32,4 +30,4 @@ jobs:
       - name: Build lib
         run: pack install filepath
       - name: Run test
-        run: pack run filepath-test -n 1000
+        run: pack test filepath -n 1000
