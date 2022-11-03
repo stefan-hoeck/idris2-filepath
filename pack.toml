@@ -2,6 +2,7 @@
 type   = "local"
 path   = "."
 ipkg   = "filepath.ipkg"
+test   = "test/test.ipkg"
 
 [custom.all.filepath-test]
 type   = "local"
