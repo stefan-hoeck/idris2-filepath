@@ -163,12 +163,13 @@ Show (Path t) where
 export
 Interpolation (Path t) where
   interpolate (PAbs sx) =
-    fastConcat
+    concat
       . ("/" ::)
       . intersperse "/"
       $ mapToList interpolate (normAbs sx) []
+  interpolate (PRel [<]) = "."
   interpolate (PRel sx) =
-    fastConcat
+    concat
       . intersperse "/"
       $ mapToList interpolate (normRel sx) []
 
@@ -232,7 +233,8 @@ Interpolation FilePath where interpolate (FP p) = interpolate p
 export
 FromString FilePath where
   fromString s = case trim s of
-    "" => FP $ PRel Lin
+    ""  => FP $ PRel Lin
+    "." => FP $ PRel Lin
     st => case map trim $ split ('/' ==) st of
       "" ::: ps => FP $ PAbs $ [<] <>< mapMaybe parse ps
       p  ::: ps => FP $ PRel $ [<] <>< mapMaybe parse (p :: ps)
@@ -363,6 +365,7 @@ namespace RelPath
   ||| on whitespace. Sorry.
   public export
   parse : String -> Maybe (Path Rel)
+  parse "." = Just (PRel [<])
   parse s =
     let ps := split ('/' ==) (unpack s)
      in PRel . (Lin <><) <$> traverse fromChars (forget ps)
