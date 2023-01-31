@@ -140,6 +140,12 @@ normalize : Path t -> Path t
 normalize (PAbs sx) = PAbs (normAbs sx)
 normalize (PRel sx) = PRel (normRel sx)
 
+||| True if the path's basename starts with a dot
+export
+isHidden : Path b -> Bool
+isHidden (PAbs $ _ :< x) = isHidden x
+isHidden (PRel $ _ :< x) = isHidden x
+isHidden _               = False
 
 --------------------------------------------------------------------------------
 --          Interfaces
@@ -301,6 +307,11 @@ namespace FilePath
   export %inline
   extension : FilePath -> Maybe Body
   extension (FP p) = extension p
+
+  ||| True if the path's basename starts with a dot
+  export %inline
+  isHidden : FilePath -> Bool
+  isHidden (FP p) = isHidden p
 
 --------------------------------------------------------------------------------
 --          fromString

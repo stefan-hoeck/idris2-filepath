@@ -260,6 +260,12 @@ export %inline
 fileStem : Body -> Maybe Body
 fileStem = map fst . split
 
+||| True if the file body starts with a dot.
+export
+isHidden : Body -> Bool
+isHidden (MkBody ('.' :: _) _) = True
+isHidden _                     = False
+
 ||| Tries to extract an extension from a file name.
 export %inline
 extension : Body -> Maybe Body
