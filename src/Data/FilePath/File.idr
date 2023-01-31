@@ -47,6 +47,11 @@ export %inline
 isAbsolute : File t -> Bool
 isAbsolute = isAbsolute . parent
 
+||| True if the file's basename starts with a dot.
+export %inline
+isHidden : File t -> Bool
+isHidden (MkF p f) = isHidden f
+
 ||| Extract the basename from a file path.
 export %inline
 basename : File t -> Body
@@ -223,3 +228,8 @@ namespace AnyFile
   export %inline
   extension : AnyFile -> Maybe Body
   extension (AF p) = extension p
+
+  ||| True if the file's basename starts with a dot.
+  export %inline
+  isHidden : AnyFile -> Bool
+  isHidden (AF p) = isHidden p
