@@ -95,13 +95,13 @@ prop_appendRightNeutral = property $ do
 
 export
 props : Group
-props = MkGroup "FilePath" [
-        ("prop_split", prop_split)
-      , ("prop_splitFile", prop_splitFile)
-      , ("prop_roundtrip", prop_roundtrip)
-      , ("prop_prependEmpty", prop_prependEmpty)
-      , ("prop_prependEmpty2", prop_prependEmpty2)
-      , ("prop_appendAssoc", prop_appendAssoc)
-      , ("prop_appendLeftNeutral", prop_appendLeftNeutral)
-      , ("prop_appendRightNeutral", prop_appendRightNeutral)
-      ]
+props = MkGroup "FilePath"
+  [ ("prop_split", prop_split)
+  , ("prop_splitFile", prop_splitFile)
+  , ("prop_roundtrip", prop_roundtrip)
+  , ("prop_prependEmpty", prop_prependEmpty)
+  , ("prop_prependEmpty2", prop_prependEmpty2)
+  , ("prop_appendAssoc", prop_appendAssoc)
+  , ("prop_appendLeftNeutral", prop_appendLeftNeutral)
+  , ("prop_appendRightNeutral", prop_appendRightNeutral)
+  ]

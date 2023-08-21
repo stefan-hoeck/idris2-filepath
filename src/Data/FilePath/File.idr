@@ -131,9 +131,10 @@ namespace AbsFile
     _                     => Nothing
 
   public export
-  fromString :  (s : String)
-             -> {auto 0 prf : IsJust (AbsFile.parse s)}
-             -> File Abs
+  fromString :
+       (s : String)
+    -> {auto 0 prf : IsJust (AbsFile.parse s)}
+    -> File Abs
   fromString s = fromJust (parse s)
 
 namespace RelFile
@@ -148,9 +149,10 @@ namespace RelFile
     _                     => Nothing
 
   public export
-  fromString :  (s : String)
-             -> {auto 0 prf : IsJust (RelFile.parse s)}
-             -> File Rel
+  fromString :
+       (s : String)
+    -> {auto 0 prf : IsJust (RelFile.parse s)}
+    -> File Rel
   fromString s = fromJust (parse s)
 
 --------------------------------------------------------------------------------
