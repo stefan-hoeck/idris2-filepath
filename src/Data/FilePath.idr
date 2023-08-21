@@ -353,9 +353,10 @@ namespace AbsPath
     _        => Nothing
 
   public export
-  fromString :  (s : String)
-             -> {auto 0 prf : IsJust (AbsPath.parse s)}
-             -> Path Abs
+  fromString :
+       (s : String)
+    -> {auto 0 prf : IsJust (AbsPath.parse s)}
+    -> Path Abs
   fromString s = fromJust (parse s)
 
 namespace RelPath
@@ -371,9 +372,10 @@ namespace RelPath
      in PRel . (Lin <><) <$> traverse fromChars (forget ps)
 
   public export
-  fromString :  (s : String)
-             -> {auto 0 prf : IsJust (RelPath.parse s)}
-             -> Path Rel
+  fromString :
+       (s : String)
+    -> {auto 0 prf : IsJust (RelPath.parse s)}
+    -> Path Rel
   fromString s = fromJust (parse s)
 
 --------------------------------------------------------------------------------

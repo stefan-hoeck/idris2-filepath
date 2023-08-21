@@ -159,10 +159,11 @@ toInner (x :: y :: ys) prf =
 toInner []             prf impossible
 
 export
-0 appendInnerChars :  (xs,ys : List Char)
-                   -> BodyInner xs
-                   -> BodyInner ys
-                   -> BodyInner (xs ++ ys)
+0 appendInnerChars :
+     (xs,ys : List Char)
+  -> BodyInner xs
+  -> BodyInner ys
+  -> BodyInner (xs ++ ys)
 appendInnerChars (h :: [])      (y :: ys) prf1 prf2 =
   and (unAnd1 prf1) prf2
 appendInnerChars (h :: t@(x :: xs)) ys prf1 prf2 =
@@ -171,10 +172,11 @@ appendInnerChars [] _ _ _ impossible
 appendInnerChars _  [] _ _ impossible
 
 export
-0 appendBodyChars :  (xs,ys : List Char)
-                  -> BodyChars xs
-                  -> BodyChars ys
-                  -> BodyChars (xs ++ ys)
+0 appendBodyChars :
+     (xs,ys : List Char)
+  -> BodyChars xs
+  -> BodyChars ys
+  -> BodyChars (xs ++ ys)
 appendBodyChars (h :: [])      (y :: ys) prf1 prf2 =
   and (unAnd1 prf1) (toInner (y :: ys) prf2)
 appendBodyChars (h :: x :: xs) ys prf1 prf2 =
@@ -252,8 +254,9 @@ export
 split : Body -> Maybe (Body,Body)
 split (MkBody b _) =
   let ss := split ('.' ==) b
-   in [| MkPair (fromChars $ join $ intersperse ['.'] (init ss))
-                (fromChars $ last ss) |]
+   in [| MkPair
+           (fromChars $ join $ intersperse ['.'] (init ss))
+           (fromChars $ last ss) |]
 
 ||| Tries to extract a stem from a file name.
 export %inline
@@ -278,8 +281,9 @@ extension = map snd . split
 -- Performance test: This typechecks *much* faster than the original
 -- implementation
 test : Body
-test =  fromString
-     $  "sdfljlsjdfsdfjl_kklsdfkj2320398wejjkwe0r9u23__02394oweijwjf"
-     ++ "sdfljlsjdfsdfjl_kklsdfkj2320398wejjkwe0r9u23__02394oweijwjf"
-     ++ "sdfljlsjdfsdfjl_kklsdfkj2320398wejjkwe0r9u23__02394oweijwjf"
-     ++ "sdfljlsjdfsdfjl_kklsdfkj2320398wejjkwe0r9u23__02394oweijwjf"
+test =
+  fromString $
+       "sdfljlsjdfsdfjl_kklsdfkj2320398wejjkwe0r9u23__02394oweijwjf"
+    ++ "sdfljlsjdfsdfjl_kklsdfkj2320398wejjkwe0r9u23__02394oweijwjf"
+    ++ "sdfljlsjdfsdfjl_kklsdfkj2320398wejjkwe0r9u23__02394oweijwjf"
+    ++ "sdfljlsjdfsdfjl_kklsdfkj2320398wejjkwe0r9u23__02394oweijwjf"
