@@ -378,6 +378,15 @@ namespace RelPath
     -> Path Rel
   fromString s = fromJust (parse s)
 
+||| A quite strict function for parsing absolute paths.
+||| This only accepts valid file bodies, so no doubling
+||| of path separators or bodies starting with or ending
+||| on whitespace. Sorry.
+public export
+parse : String -> Maybe FilePath
+parse str = FP <$> AbsPath.parse str
+        <|> FP <$> RelPath.parse str
+
 --------------------------------------------------------------------------------
 --          Tests
 --------------------------------------------------------------------------------
