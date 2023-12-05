@@ -182,6 +182,15 @@ Interpolation AnyFile where interpolate (AF p) = interpolate p
 
 namespace AnyFile
 
+  ||| A quite strict function for parsing absolute paths.
+  ||| This only accepts valid file bodies, so no doubling
+  ||| of path separators or bodies starting with or ending
+  ||| on whitespace. Sorry.
+  public export
+  parse : String -> Maybe AnyFile
+  parse str = AF <$> AbsFile.parse str
+          <|> AF <$> RelFile.parse str
+
   ||| Try and split a path into parent directory and
   ||| file/directory name.
   public export
