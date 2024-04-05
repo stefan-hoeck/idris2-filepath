@@ -14,7 +14,7 @@ import public Data.String
 --          Path
 --------------------------------------------------------------------------------
 
-infixl 5 </>, />
+export infixl 5 </>, />
 
 ||| A path in the file system is either relative
 ||| or absolute.
