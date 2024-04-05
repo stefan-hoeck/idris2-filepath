@@ -242,7 +242,7 @@ export
 preDot : Body -> Body
 preDot (MkBody cs p) = MkBody ('.' :: cs) (preDotBodyChars _ p)
 
-infixr 7 <.>
+export infixr 7 <.>
 
 ||| Append a file ending to a path body.
 export
