@@ -4,6 +4,7 @@ module Data.FilePath.Body
 
 import Data.List
 import Data.List1
+import System.Info
 
 %default total
 
@@ -36,10 +37,10 @@ and {x = False} {y = _}     _ _ impossible
 --          Constants
 --------------------------------------------------------------------------------
 
-||| The Unix path separator
+||| The platform dependent path separator
 public export %inline
 Sep : Char
-Sep = '/'
+Sep = if isWindows then '\\' else '/'
 
 --------------------------------------------------------------------------------
 --          BodyChar
@@ -49,8 +50,9 @@ Sep = '/'
 ||| We don't allow path separators and control characters in path bodies.
 public export
 isBodyChar : Char -> Bool
-isBodyChar '/' = False
-isBodyChar c   = not (isControl c)
+isBodyChar '/'  = False
+isBodyChar '\\' = False
+isBodyChar c    = not (isControl c)
 
 public export
 0 BodyChar : Char -> Type

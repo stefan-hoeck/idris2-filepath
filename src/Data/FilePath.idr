@@ -16,6 +16,28 @@ import public Data.String
 
 export infixl 5 </>, />
 
+public export
+data AbsType = Unix | Disk Char | UNC String String
+
+export
+Show AbsType where
+  showPrec p Unix        = "Unix"
+  showPrec p (Disk d)    = showCon p "Disk" $ showArg d
+  showPrec p (UNC sv sh) = showCon p "UNC" $ showArg sv ++ showArg sh
+
+export
+Interpolation AbsType where
+  interpolate Unix        = "/"
+  interpolate (Disk d)    = "\{String.singleton d}:\\"
+  interpolate (UNC sv sh) = "\\\\\{sv}\\\{sh}\\"
+
+export
+Eq AbsType where
+  Unix == Unix = True
+  Disk d == Disk d' = d == d'
+  UNC sv sh == UNC sv' sh' = sv == sv' && sh == sh'
+  _ == _ = False
+
 ||| A path in the file system is either relative
 ||| or absolute.
 public export
@@ -27,7 +49,7 @@ data PathType = Rel | Abs
 public export
 data Path : PathType -> Type where
   ||| An absolute path
-  PAbs   : SnocList Body -> Path Abs
+  PAbs   : AbsType -> SnocList Body -> Path Abs
 
   ||| A relative path
   PRel   : SnocList Body -> Path Rel
@@ -36,8 +58,8 @@ data Path : PathType -> Type where
 ||| relative.
 public export
 (</>) : Path t -> Path Rel -> Path t
-(</>) (PAbs sx) (PRel sy) = PAbs (sx ++ sy)
-(</>) (PRel sx) (PRel sy) = PRel (sx ++ sy)
+(</>) (PAbs at sx) (PRel sy) = PAbs at (sx ++ sy)
+(</>) (PRel sx) (PRel sy)    = PRel (sx ++ sy)
 
 ||| Append a file or directory to a path.
 export %inline
@@ -48,30 +70,40 @@ fp /> s = fp </> PRel [< s]
 ||| file/directory name.
 public export
 split : Path t -> Maybe (Path t, Body)
-split (PAbs (sx :< x)) = Just (PAbs sx, x)
-split (PRel (sx :< x)) = Just (PRel sx, x)
-split (PAbs [<])       = Nothing
-split (PRel [<])       = Nothing
+split (PAbs at (sx :< x)) = Just (PAbs at sx, x)
+split (PRel (sx :< x))    = Just (PRel sx, x)
+split (PAbs _ [<])        = Nothing
+split (PRel [<])          = Nothing
 
 ||| Append a file ending to a path. If the path is empty,
 ||| this appends a hidden file/directory by prepending the
 ||| name with a dot.
 export
 (<.>) : Path t -> Body -> Path t
-PAbs (sx :< x) <.> s = PAbs (sx :< (x <.> s))
-PRel (sx :< x) <.> s = PRel (sx :< (x <.> s))
-PRel [<]       <.> s = PRel [< preDot s]
-PAbs [<]       <.> s = PAbs [< preDot s]
+PAbs at (sx :< x) <.> s = PAbs at (sx :< (x <.> s))
+PRel (sx :< x)    <.> s = PRel (sx :< (x <.> s))
+PRel [<]          <.> s = PRel [< preDot s]
+PAbs at [<]       <.> s = PAbs at [< preDot s]
 
-||| The root of the file system.
+||| The root of the file system. (unix)
 public export
 root : Path Abs
-root = PAbs [<]
+root = PAbs Unix [<]
+
+||| The root of the given disk. (windows)
+public export
+disk : Char -> Path Abs
+disk d = PAbs (Disk d) [<]
+
+||| The root of the given network share. (windows)
+public export
+network : String -> String -> Path Abs
+network sv sh = PAbs (UNC sv sh) [<]
 
 ||| Checks whether an unknown path is absolute or not.
 export
 isAbsolute : Path t -> Bool
-isAbsolute (PAbs _) = True
+isAbsolute (PAbs _ _) = True
 isAbsolute (PRel _) = False
 
 ||| Tries to extract the basename from a path.
@@ -137,15 +169,15 @@ normRel (sx :< x)  = normRel sx :< x
 ||| silently dropped.
 export
 normalize : Path t -> Path t
-normalize (PAbs sx) = PAbs (normAbs sx)
-normalize (PRel sx) = PRel (normRel sx)
+normalize (PAbs at sx) = PAbs at (normAbs sx)
+normalize (PRel sx)    = PRel (normRel sx)
 
 ||| True if the path's basename starts with a dot
 export
 isHidden : Path b -> Bool
-isHidden (PAbs $ _ :< x) = isHidden x
-isHidden (PRel $ _ :< x) = isHidden x
-isHidden _               = False
+isHidden (PAbs _ $ _ :< x) = isHidden x
+isHidden (PRel $ _ :< x)   = isHidden x
+isHidden _                 = False
 
 --------------------------------------------------------------------------------
 --          Interfaces
@@ -157,37 +189,37 @@ mapToList f (sx :< x) xs = mapToList f sx (f x :: xs)
 
 export
 Show (Path t) where
-  showPrec p (PAbs sx) = showCon p "PAbs" $ showArg sx
-  showPrec p (PRel sx) = showCon p "PRel" $ showArg sx
+  showPrec p (PAbs at sx) = showCon p "PAbs" $ showArg at ++ showArg sx
+  showPrec p (PRel sx)    = showCon p "PRel" $ showArg sx
 
 export
 Interpolation (Path t) where
-  interpolate (PAbs sx) =
+  interpolate (PAbs at sx) =
     concat
-      . ("/" ::)
-      . intersperse "/"
+      . (interpolate at ::)
+      . intersperse (singleton Sep)
       $ mapToList interpolate (normAbs sx) []
   interpolate (PRel [<]) = "."
   interpolate (PRel sx) =
     concat
-      . intersperse "/"
+      . intersperse (singleton Sep)
       $ mapToList interpolate (normRel sx) []
 
 ||| Heterogeneous equality for paths
 export
 heq : Path t1 -> Path t2 -> Bool
-heq (PAbs sx) (PAbs sy) = sx == sy
-heq (PRel sx) (PRel sy) = sx == sy
-heq _         _         = False
+heq (PAbs at sx) (PAbs at' sy) = at == at' && sx == sy
+heq (PRel sx) (PRel sy)        = sx == sy
+heq _         _                = False
 
 
 ||| Heterogeneous comparison of paths
 export
 hcomp : Path t1 -> Path t2 -> Ordering
-hcomp (PAbs sx) (PAbs sy) = compare sx sy
-hcomp (PRel sx) (PRel sy) = compare sx sy
-hcomp (PAbs _)  (PRel _)  = LT
-hcomp (PRel _)  (PAbs _)  = GT
+hcomp (PAbs at sx) (PAbs at' sy) = compare sx sy
+hcomp (PRel sx) (PRel sy)        = compare sx sy
+hcomp (PAbs _ _)  (PRel _)       = LT
+hcomp (PRel _)  (PAbs _ _)       = GT
 
 public export %inline
 Eq (Path t) where (==) = heq
@@ -235,9 +267,12 @@ FromString FilePath where
   fromString s = case trim s of
     ""  => FP $ PRel Lin
     "." => FP $ PRel Lin
-    st => case map trim $ split ('/' ==) st of
-      "" ::: ps => FP $ PAbs $ [<] <>< mapMaybe parse ps
-      p  ::: ps => FP $ PRel $ [<] <>< mapMaybe parse (p :: ps)
+    st => case map trim $ split (\c => c == '/' || c == '\\') st of
+      "" ::: "" :: sv :: sh :: ps => FP $ PAbs (UNC sv sh) $ [<] <>< mapMaybe parse ps
+      p  ::: ps => case strM p of
+        StrNil => FP $ PAbs Unix $ [<] <>< mapMaybe parse ps
+        StrCons d ":" => FP $ PAbs (Disk d) $ [<] <>< mapMaybe parse ps
+        _ => FP $ PRel $ [<] <>< mapMaybe parse (p :: ps)
 
 namespace FilePath
 
@@ -267,7 +302,7 @@ namespace FilePath
   ||| The root of the file system.
   public export
   root : FilePath
-  root = FP $ PAbs [<]
+  root = FP $ PAbs Unix [<]
 
   ||| Checks whether an unknown path is absolute or not.
   export
@@ -322,11 +357,11 @@ namespace FilePath
 ||| Witness that the given file path is an absolute path
 public export
 data IsAbs : FilePath -> Type where
-  ItIsAbs : IsAbs (FP $ PAbs sx)
+  ItIsAbs : IsAbs (FP $ PAbs at sx)
 
 public export %inline
 toAbs : (fp : FilePath) -> {auto 0 prf : IsAbs fp} -> Path Abs
-toAbs (FP (PAbs sx)) = PAbs sx
+toAbs (FP (PAbs at sx)) = PAbs at sx
 toAbs (FP (PRel _)) impossible
 
 ||| Witness that the given file path is an absolute path
@@ -346,11 +381,36 @@ namespace AbsPath
   ||| on whitespace. Sorry.
   public export
   parse : String -> Maybe (Path Abs)
-  parse s = case unpack s of
-    '/' :: t =>
-      let ps := split ('/' ==) t
-       in PAbs . (Lin <><) <$> traverse fromChars (forget ps)
-    _        => Nothing
+  parse s =
+    let cs := unpack s
+     in parseUNC cs <|> parseDisk cs <|> parseUnix cs
+    where
+      parseBody : List Char -> Maybe (SnocList Body)
+      parseBody t =
+        let ps := split (\c => c == '/' || c == '\\') t
+         in (Lin <><) <$> traverse fromChars (forget ps)
+    
+      parseUNCBody : List Char -> Maybe (Path Abs)
+      parseUNCBody t = case split (\c => c == '/' || c == '\\') t of
+        [] ::: _        => Nothing
+        _ ::: [] :: _   => Nothing
+        sv ::: sh :: ps => PAbs (UNC (pack sv) (pack sh)) . (Lin <><) <$> traverse fromChars ps
+        _               => Nothing
+
+      parseUnix : List Char -> Maybe (Path Abs)
+      parseUnix ('/' :: t)  = PAbs Unix <$> parseBody t
+      parseUnix ('\\' :: t) = PAbs Unix <$> parseBody t
+      parseUnix _           = Nothing
+      
+      parseDisk : List Char -> Maybe (Path Abs)
+      parseDisk (d :: ':' :: '/' :: t)  = PAbs (Disk d) <$> parseBody t
+      parseDisk (d :: ':' :: '\\' :: t) = PAbs (Disk d) <$> parseBody t
+      parseDisk _                       = Nothing
+
+      parseUNC : List Char -> Maybe (Path Abs)
+      parseUNC ('/' :: '/' :: t)   = parseUNCBody t
+      parseUNC ('\\' :: '\\' :: t) = parseUNCBody t
+      parseUNC _                   = Nothing
 
   public export
   fromString :
@@ -368,7 +428,7 @@ namespace RelPath
   parse : String -> Maybe (Path Rel)
   parse "." = Just (PRel [<])
   parse s =
-    let ps := split ('/' ==) (unpack s)
+    let ps := split (\c => c == '/' || c == '\\') (unpack s)
      in PRel . (Lin <><) <$> traverse fromChars (forget ps)
 
   public export
@@ -399,6 +459,18 @@ testRel =
 
 -- Performance test: This typechecks *much* faster than the original
 -- implementation
-testAbs : Path Abs
-testAbs =
+testAbsUnix : Path Abs
+testAbsUnix =
   "/bdlkjf/sdf/bb/sdfljlsjdfsdfjl/kklsdj2320398we/_jkw0r/u23__0294owe/jwjf.txt"
+
+-- Performance test: This typechecks *much* faster than the original
+-- implementation
+testAbsDisk : Path Abs
+testAbsDisk =
+  "C:\\bdlkjf\\sdf\\bb\\sdfljlsjdfsdfjl\\kklsdj2320398we\\_jkw0r\\u23__0294owe\\jwjf.txt"
+
+-- Performance test: This typechecks *much* faster than the original
+-- implementation
+testAbsUNC : Path Abs
+testAbsUNC =
+  "\\\\localhost\\share\\dfljlsjdfsdfjl\\kklsdj2320398we\\_jkw0r\\u23__0294owe\\jwjf.txt"
