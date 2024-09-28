@@ -127,8 +127,8 @@ namespace AbsFile
   public export
   parse : String -> Maybe (File Abs)
   parse s = case AbsPath.parse s of
-    Just (PAbs $ sx :< x) => Just $ MkF (PAbs sx) x
-    _                     => Nothing
+    Just (PAbs at $ sx :< x) => Just $ MkF (PAbs at sx) x
+    _                        => Nothing
 
   public export
   fromString :
