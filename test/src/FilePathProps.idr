@@ -29,8 +29,15 @@ relDir : Gen (Path Rel)
 relDir = PRel . (Lin <><) <$> list (linear 0 6) body
 
 export
+absType : Gen AbsType
+absType = choice [pure Unix, map Disk upper, [| UNC body' body' |]]
+
+export
 absDir : Gen (Path Abs)
-absDir = PAbs . (Lin <><) <$> list (linear 0 6) body
+absDir = [| PAbs absType pth |]
+  where
+    pth : Gen (SnocList Body)
+    pth =  (Lin <><) <$> list (linear 0 6) body
 
 export
 dir : Gen FilePath
