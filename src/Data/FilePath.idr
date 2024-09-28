@@ -104,7 +104,7 @@ network sv sh = PAbs (UNC sv sh) [<]
 export
 isAbsolute : Path t -> Bool
 isAbsolute (PAbs _ _) = True
-isAbsolute (PRel _) = False
+isAbsolute (PRel _)   = False
 
 ||| Tries to extract the basename from a path.
 export %inline
@@ -389,7 +389,7 @@ namespace AbsPath
       parseBody t =
         let ps := split (\c => c == '/' || c == '\\') t
          in (Lin <><) <$> traverse fromChars (forget ps)
-    
+
       parseUNCBody : List Char -> Maybe (Path Abs)
       parseUNCBody t = case split (\c => c == '/' || c == '\\') t of
         [] ::: _        => Nothing
@@ -401,7 +401,7 @@ namespace AbsPath
       parseUnix ('/' :: t)  = PAbs Unix <$> parseBody t
       parseUnix ('\\' :: t) = PAbs Unix <$> parseBody t
       parseUnix _           = Nothing
-      
+
       parseDisk : List Char -> Maybe (Path Abs)
       parseDisk (d :: ':' :: '/' :: t)  = PAbs (Disk d) <$> parseBody t
       parseDisk (d :: ':' :: '\\' :: t) = PAbs (Disk d) <$> parseBody t
