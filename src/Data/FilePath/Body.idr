@@ -40,7 +40,7 @@ and {x = False} {y = _}     _ _ impossible
 ||| The platform dependent path separator
 public export %inline
 Sep : Char
-Sep = if isWindows then '\\' else '/'
+Sep = '/'
 
 --------------------------------------------------------------------------------
 --          BodyChar
