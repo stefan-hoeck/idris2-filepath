@@ -17,7 +17,36 @@ import public Data.String
 export infixl 5 </>, />
 
 public export
-data AbsType = Unix | Disk Char | UNC String String
+record DriveLetter where
+  constructor MkDriveLetter
+  letter : Char
+  0 prf  : isAlpha letter === True
+
+export
+fromChar : (c : Char) -> {auto 0 prf : isAlpha c === True} -> DriveLetter
+fromChar c = MkDriveLetter c prf
+
+namespace DriveLetter
+  public export
+  parse : Char -> Maybe DriveLetter
+  parse c with (isAlpha c) proof prf
+    parse c | True  = Just $ MkDriveLetter c prf
+    parse c | False = Nothing
+
+export
+Show DriveLetter where
+  showPrec p (MkDriveLetter c _) = showCon p "MkDriveLetter" $ showArg c ++ " _"
+
+export
+Interpolation DriveLetter where
+  interpolate (MkDriveLetter c _) = singleton c
+
+export
+Eq DriveLetter where
+  MkDriveLetter c _ == MkDriveLetter d _ = c == d
+
+public export
+data AbsType = Unix | Disk DriveLetter | UNC Body Body
 
 export
 Show AbsType where
@@ -28,7 +57,7 @@ Show AbsType where
 export
 Interpolation AbsType where
   interpolate Unix        = "/"
-  interpolate (Disk d)    = "\{String.singleton d}:\\"
+  interpolate (Disk d)    = "\{d}:\\"
   interpolate (UNC sv sh) = "\\\\\{sv}\\\{sh}\\"
 
 export
@@ -92,12 +121,12 @@ root = PAbs Unix [<]
 
 ||| The root of the given disk. (windows)
 public export
-disk : Char -> Path Abs
+disk : DriveLetter -> Path Abs
 disk d = PAbs (Disk d) [<]
 
 ||| The root of the given network share. (windows)
 public export
-network : String -> String -> Path Abs
+network : Body -> Body -> Path Abs
 network sv sh = PAbs (UNC sv sh) [<]
 
 ||| Checks whether an unknown path is absolute or not.
@@ -267,12 +296,16 @@ FromString FilePath where
   fromString s = case trim s of
     ""  => FP $ PRel Lin
     "." => FP $ PRel Lin
-    st => case map trim $ split (\c => c == '/' || c == '\\') st of
-      "" ::: "" :: sv :: sh :: ps => FP $ PAbs (UNC sv sh) $ [<] <>< mapMaybe parse ps
-      p  ::: ps => case strM p of
-        StrNil => FP $ PAbs Unix $ [<] <>< mapMaybe parse ps
-        StrCons d ":" => FP $ PAbs (Disk d) $ [<] <>< mapMaybe parse ps
-        _ => FP $ PRel $ [<] <>< mapMaybe parse (p :: ps)
+    st  => case map trim $ split (\c => c == '/' || c == '\\') st of
+      "" ::: "" :: sv :: sh :: ps => case (parse sv, parse sh) of
+        (Just sv', Just sh') => FP $ PAbs (UNC sv' sh') $ [<] <>< mapMaybe parse ps
+        _                    => FP $ PAbs Unix $ [<] <>< mapMaybe parse (sv :: sh :: ps)
+      p  ::: ps                   => case strM p of
+        StrNil        => FP $ PAbs Unix $ [<] <>< mapMaybe parse ps
+        StrCons c ":" => case parse c of
+          Just d  => FP $ PAbs (Disk d) $ [<] <>< mapMaybe parse ps
+          Nothing => FP $ PRel $ [<] <>< mapMaybe parse (p :: ps)
+        _         => FP $ PRel $ [<] <>< mapMaybe parse (p :: ps)
 
 namespace FilePath
 
@@ -394,7 +427,7 @@ namespace AbsPath
       parseUNCBody t = case split (\c => c == '/' || c == '\\') t of
         [] ::: _        => Nothing
         _ ::: [] :: _   => Nothing
-        sv ::: sh :: ps => PAbs (UNC (pack sv) (pack sh)) . (Lin <><) <$> traverse fromChars ps
+        sv ::: sh :: ps => Just $ PAbs (UNC !(fromChars sv) !(fromChars sh)) ((Lin <><) !(traverse fromChars ps))
         _               => Nothing
 
       parseUnix : List Char -> Maybe (Path Abs)
@@ -403,8 +436,8 @@ namespace AbsPath
       parseUnix _           = Nothing
 
       parseDisk : List Char -> Maybe (Path Abs)
-      parseDisk (d :: ':' :: '/' :: t)  = PAbs (Disk d) <$> parseBody t
-      parseDisk (d :: ':' :: '\\' :: t) = PAbs (Disk d) <$> parseBody t
+      parseDisk (d :: ':' :: '/' :: t)  = [| PAbs (Disk <$> parse d) (parseBody t) |]
+      parseDisk (d :: ':' :: '\\' :: t) = [| PAbs (Disk <$> parse d) (parseBody t) |]
       parseDisk _                       = Nothing
 
       parseUNC : List Char -> Maybe (Path Abs)

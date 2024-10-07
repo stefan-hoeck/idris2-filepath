@@ -29,8 +29,12 @@ relDir : Gen (Path Rel)
 relDir = PRel . (Lin <><) <$> list (linear 0 6) body
 
 export
+driveLetter : Gen DriveLetter
+driveLetter = fromMaybe 'C' . parse <$> choice [upper, lower]
+
+export
 absType : Gen AbsType
-absType = choice [pure Unix, map Disk upper, [| UNC body' body' |]]
+absType = choice [pure Unix, map Disk driveLetter, [| UNC body body |]]
 
 export
 absDir : Gen (Path Abs)
