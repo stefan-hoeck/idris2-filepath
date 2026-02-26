@@ -395,7 +395,6 @@ data IsAbs : FilePath -> Type where
 public export %inline
 toAbs : (fp : FilePath) -> {auto 0 prf : IsAbs fp} -> Path Abs
 toAbs (FP (PAbs at sx)) = PAbs at sx
-toAbs (FP (PRel _)) impossible
 
 ||| Witness that the given file path is an absolute path
 public export
@@ -405,7 +404,6 @@ data IsRel : FilePath -> Type where
 public export %inline
 toRel : (fp : FilePath) -> {auto 0 prf : IsRel fp} -> Path Rel
 toRel (FP (PRel sx)) = PRel sx
-toRel (FP (PAbs _)) impossible
 
 namespace AbsPath
   ||| A quite strict function for parsing absolute paths.
